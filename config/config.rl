@@ -18,12 +18,14 @@ func MakeParser(data string) (*plib.Parser, error){
     argList := []string{}
     errorSampleStart := 0
     _ = errorSampleStart
+    var err error
     // only for debug
     argName := ""
 
     sendText := func(){
         if p-mark > 0 {
-            fmt.Printf("TEXT: `%s`\n", data[mark:p])
+            /*fmt.Printf("TEXT: `%s`\n", data[mark:p])*/
+            parser.AddTextParser(string(data[mark:p]))
         }
     }
 
@@ -40,19 +42,19 @@ func MakeParser(data string) (*plib.Parser, error){
         action mark { mark = p }
         action tokname {
             tokenName = data[mark:p]
-            print("TOKEN: ")
-            println(tokenName)
+            /*print("TOKEN: ")*/
+            /*println(tokenName)*/
         }
         action facname {
             factoryName = data[mark:p]
-            print("FACTORY: ")
-            println(factoryName)
+            /*print("FACTORY: ")*/
+            /*println(factoryName)*/
         }
         action arg {
             argName = data[mark:p]
             argList = append(argList, argName)
-            print("ARG: ")
-            println(argName)
+            /*print("ARG: ")*/
+            /*println(argName)*/
         }
         action error {
             if p > 10 {
@@ -62,12 +64,21 @@ func MakeParser(data string) (*plib.Parser, error){
         }
 
         action simple_token {
-            tokenName = data[mark:p]
-            if tokenName == "ignore" || tokenName == "ignore_rest" {
-                print("TOKEN: ")
-                println(tokenName)
+            factoryName = data[mark:p]
+            // TODO: ugly hard coded names
+            if factoryName == "ignore" || factoryName == "ignore_rest" {
+                /*print("TOKEN: ")*/
+                /*println(factoryName)*/
             } else {
-                return nil, errors.New(fmt.Sprintf("`%s` at column %d is not a known simple token.\nAllowed simple tokens are `ignore` and `ignore_rest`",mark, data[mark:p]))
+                return nil, errors.New(fmt.Sprintf("`%s` at column %d is not a known simple token.\nAllowed simple tokens are `ignore` and `ignore_rest`",mark, factoryName))
+            }
+        }
+
+        action emit {
+            /*fmt.Printf("emit token `%s`\n", tokenName)*/
+            err = parser.MakeSubparser(tokenName, factoryName, argList)
+            if err != nil {
+                return nil, err
             }
         }
 
@@ -87,12 +98,12 @@ func MakeParser(data string) (*plib.Parser, error){
         ARG = (DIGIT|LETTER)+ %arg; 
         ARGLIST = ( ARG ( ARG_SEP ARG)*)*;
         FACTORY = FAC_NAME :>> "(" @facname %mark ARGLIST ")";
-        TOKEN = SIMPLE_TOKEN
+        TOKEN = (SIMPLE_TOKEN
                 |( TOKEN_SEP
                    TOKEN_NAME >start_token :>>
                    FAC_SEP @tokname %mark
                    FACTORY
-                   TOKEN_SEP %mark) $err(error);
+                   TOKEN_SEP %mark)) %emit $err(error);
 
         main := ( TOKEN | TEXT ) * $err(error);
 
