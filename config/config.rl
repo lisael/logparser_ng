@@ -8,7 +8,6 @@ import (
 
 
 func MakeParser(data string) (*plib.Parser, error){
-    println("building parser...")
     mark := 0
     cs, p, pe, eof := 0, 0, len(data), len(data)
     _ = eof
@@ -51,10 +50,13 @@ func MakeParser(data string) (*plib.Parser, error){
             /*println(factoryName)*/
         }
         action arg {
-            argName = data[mark:p]
-            argList = append(argList, argName)
-            /*print("ARG: ")*/
-            /*println(argName)*/
+            if mark - p + 1 > 0{
+                argName = data[mark:p-1]
+                argList = append(argList, argName)
+                //print(data[:p])
+                //print(" ARG: ")
+                //println(argName)
+            }
         }
         action error {
             if p > 10 {
@@ -64,19 +66,23 @@ func MakeParser(data string) (*plib.Parser, error){
         }
 
         action simple_token {
-            factoryName = data[mark:p]
-            // TODO: ugly hard coded names
-            if factoryName == "ignore" || factoryName == "ignore_rest" {
-                /*print("TOKEN: ")*/
-                /*println(factoryName)*/
+            tokenName = data[mark:p]
+            /*print("TOKEN: ")*/
+            /*println(tokenName)*/
+            if tokenName[0] == '_'{
+                // special tokens are actually unnamed tokens
+                // eg |_ignore| => |:_ignore()|
+                factoryName = tokenName
+                tokenName = factoryName
             } else {
-                return nil, errors.New(fmt.Sprintf("`%s` at column %d is not a known simple token.\nAllowed simple tokens are `ignore` and `ignore_rest`",mark, factoryName))
+                factoryName="non_blank"
             }
         }
 
         action emit {
-            /*fmt.Printf("emit token `%s`\n", tokenName)*/
+            fmt.Printf("emit token `%s`\n", tokenName)
             err = parser.MakeSubparser(tokenName, factoryName, argList)
+            if len(argList) != 0 {println(argList[0])}
             if err != nil {
                 return nil, err
             }
@@ -88,16 +94,18 @@ func MakeParser(data string) (*plib.Parser, error){
         TOKEN_SEP = "|";
         FAC_SEP = ":";
         WHITESPACE = ( ' ' | '\t' ) +;
-        ARG_SEP = WHITESPACE* "," WHITESPACE* %mark;
-        TOKEN_NAME = IDENTIFIER;
+        ARG_SEP = WHITESPACE* "," WHITESPACE*;
+        TOKEN_NAME = IDENTIFIER?;
         FAC_NAME = IDENTIFIER;
         TEXT = [^|] + ;
         SIMPLE_TOKEN =  TOKEN_SEP
                         TOKEN_NAME >start_token :>>
                         TOKEN_SEP @simple_token %mark;
-        ARG = (DIGIT|LETTER)+ %arg; 
-        ARGLIST = ( ARG ( ARG_SEP ARG)*)*;
-        FACTORY = FAC_NAME :>> "(" @facname %mark ARGLIST ")";
+        SIMPLE_ARG = (DIGIT|LETTER)+; 
+        STRING_ARG = ('"' [^"]* '"'); #'//restore go syntax highlighting
+        ARG = (SIMPLE_ARG | STRING_ARG);
+        ARGLIST = ( ARG("" :>>  ARG_SEP %arg %mark ARG)*)?;
+        FACTORY = FAC_NAME :>> "(" @facname %mark ARGLIST :>> ")" %arg;
         TOKEN = (SIMPLE_TOKEN
                 |( TOKEN_SEP
                    TOKEN_NAME >start_token :>>
