@@ -13,8 +13,10 @@ type factory func([]string) (Subparser, error)
 type ResultMap map[string][]rune
 
 var factories map[string]factory = map[string]factory{
-	"ignore": IgnoreFactory,
+	"_ignore": NonBlankFactory,
+	"non_blank": NonBlankFactory,
 	"ipv4": IPV4Factory,
+    "any": AnyFactory,
 }
 
 func RegisterFactory(fact factory, name string){
@@ -29,7 +31,12 @@ type Parser struct{
 	resultNames	[]string
 }
 
+var defereds []*DeferredFactoryDef = []*DeferredFactoryDef{}
+var texts []string = []string{}
+
 func (p *Parser) MakeSubparser(tokenName string, factory_name string, args []string) error {
+    var currentDefered *DeferredFactoryDef
+    // TODO: raise an error for the number of args.
 	// try to add the token name to result names
 	fmt.Printf("making `%s` subparser for token `%s`", factory_name, tokenName )
 	if tokenName != ""{
@@ -40,17 +47,26 @@ func (p *Parser) MakeSubparser(tokenName string, factory_name string, args []str
 		}
 	}
 	p.resultNames = append(p.resultNames, tokenName)
-    // find the factory and insatanciate a subparser
+    // find the factory and instanciate a subparser
 	factory := factories[factory_name]
     if factory == nil {
         return errors.New(fmt.Sprintf("Factory `%s` doesn't exit", factory_name))
     }
+    println("calling factory")
 	subp, err := factory(args)
 	if err != nil{
-        return err
+        switch err.(type){
+        case *DeferredFactoryDef:
+            currentDefered = err.(*DeferredFactoryDef)
+            currentDefered.Args = args
+            defereds = append(defereds, currentDefered)
+            p.subparsers = append(p.subparsers, subp)
+            return nil
+        default:
+            return err
+        }
 	}
     p.subparsers = append(p.subparsers, subp)
-	fmt.Println("  Done")
     return nil
 }
 
@@ -62,8 +78,8 @@ func (p *Parser) AddTextParser(txt string){
 	fmt.Println("  Done")
 }
 
-func (p *Parser) AddIgnoreParser(){
-	println("TODO Parser.AddIgnoreParser")
+func (p *Parser) SubparsersNumber() int{
+    return len(p.subparsers)
 }
 
 func (p *Parser) ParseOnce(data []rune) (ResultMap, error){
