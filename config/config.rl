@@ -6,6 +6,9 @@ import (
     "errors"
 )
 
+func MakeFormater(data string){
+//TODO
+}
 
 func MakeParser(data string) (*plib.Parser, error){
     mark := 0
@@ -41,8 +44,8 @@ func MakeParser(data string) (*plib.Parser, error){
         action mark { mark = p }
         action tokname {
             tokenName = data[mark:p]
-            /*print("TOKEN: ")*/
-            /*println(tokenName)*/
+            //print("TOKEN: ")
+            //println(tokenName)
         }
         action facname {
             factoryName = data[mark:p]
@@ -50,10 +53,14 @@ func MakeParser(data string) (*plib.Parser, error){
             /*println(factoryName)*/
         }
         action arg {
-            if mark - p + 1 > 0{
+            if p - 1 - mark > 0 {
                 argName = data[mark:p-1]
+                if len(argName) > 1{
+                    if argName[0] == '"' || argName[0] == '\''{
+                        argName = argName[1:len(argName)-1]
+                    }
+                }
                 argList = append(argList, argName)
-                //print(data[:p])
                 //print(" ARG: ")
                 //println(argName)
             }
@@ -73,16 +80,16 @@ func MakeParser(data string) (*plib.Parser, error){
                 // special tokens are actually unnamed tokens
                 // eg |_ignore| => |:_ignore()|
                 factoryName = tokenName
-                tokenName = factoryName
+                tokenName = ""
             } else {
                 factoryName="non_blank"
             }
         }
 
         action emit {
-            fmt.Printf("emit token `%s`\n", tokenName)
+            //fmt.Printf("emit token `%s`\n", tokenName)
             err = parser.MakeSubparser(tokenName, factoryName, argList)
-            if len(argList) != 0 {println(argList[0])}
+            argList = []string{}
             if err != nil {
                 return nil, err
             }
@@ -102,7 +109,7 @@ func MakeParser(data string) (*plib.Parser, error){
                         TOKEN_NAME >start_token :>>
                         TOKEN_SEP @simple_token %mark;
         SIMPLE_ARG = (DIGIT|LETTER)+; 
-        STRING_ARG = ('"' [^"]* '"'); #'//restore go syntax highlighting
+        STRING_ARG = ('"' [^"]* '"') | ("'" [^']* "'"); #'//restore go syntax highlighting
         ARG = (SIMPLE_ARG | STRING_ARG);
         ARGLIST = ( ARG("" :>>  ARG_SEP %arg %mark ARG)*)?;
         FACTORY = FAC_NAME :>> "(" @facname %mark ARGLIST :>> ")" %arg;
@@ -119,7 +126,8 @@ func MakeParser(data string) (*plib.Parser, error){
         write exec;
     }%%
     sendText()
-    return parser, nil
+    err = parser.Finalize()
+    return parser, err
 }
 
 // |ip:ipv4()| - - [|date:catch_all()|] "|ignore| |url:nonblank()| |ignore| |response_code:nonblank()| |ignore| |ignore| |user_agent:quoted(\"\\\"\",true)|
