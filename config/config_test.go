@@ -18,7 +18,8 @@ func TestMakeParser(t *testing.T) {
         makeParserTest{ "hello |my_token| world", true, 3 },
         makeParserTest{ "hello |_ignore| world", true, 3 },
         makeParserTest{ "hello |url:non_blank(coucou, true)| world", true, 3 },
-        makeParserTest{ "hello |url:non_blank(\"coucou hello\")| world",
+        makeParserTest{ "hello |url:non_blank('coucou')| world", true, 3 },
+        makeParserTest{ "hello |url:non_blank(\"coucou hello\", 'hello coucou')| world",
                         true, 3 },
         makeParserTest{ "hello |:non_blank()| world", true, 3 },
         makeParserTest{ "hello |url:any()| world", true, 3 },
@@ -33,7 +34,7 @@ func TestMakeParser(t *testing.T) {
             t.Errorf("config `%s` should %s", testCase.config, ok)
         }
         if p != nil {
-            nr := p.SubparsersNumber()
+            nr := p.SubparsersCount()
             if nr != testCase.tokenNr {
                 t.Errorf("config `%s` created %d tokens. should be %d", testCase.config, nr, testCase.tokenNr)
             }
