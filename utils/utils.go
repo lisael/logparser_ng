@@ -43,6 +43,7 @@ func (r *FileReader)ReadLines() (output chan *string){
     return
 }
 
+// not used at the moment, the memory leak came from a delayed fs flush
 type Janitor struct{}
 
 func (j *Janitor)Pipe(input chan *string) (output chan *string){
@@ -53,7 +54,7 @@ func (j *Janitor)Pipe(input chan *string) (output chan *string){
             i++
             if i == 200000 {
                 //println("GC")
-                //runtime.GC()
+                runtime.GC()
                 //println(runtime.NumGoroutine())
                 i=0
             }
