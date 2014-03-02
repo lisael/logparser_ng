@@ -16,19 +16,20 @@ type DeferredFactoryDef struct{
 func (d DeferredFactoryDef)Error() string{return ""}
 
 ////////////// non blank
-func NonBlankParser(data []rune, pr *Parser) ([]rune, error){
-    startIdx := pr.idx
+func NonBlankParser(pctx *ParsingContext) ([]rune, error){
+    data := pctx.data
+    startIdx := pctx.idx
 start:
-    if pr.idx == pr.eof{ goto break_ }
-    switch data[pr.idx] {
+    if pctx.idx == pctx.eof{ goto break_ }
+    switch data[pctx.idx] {
     case ' ', '\t':
         goto break_
     default:
-        pr.idx ++
+        pctx.idx ++
         goto start
     }
 break_:
-    return data[startIdx: pr.idx], nil
+    return data[startIdx: pctx.idx], nil
 }
 
 // fake factory, requires no args
@@ -45,13 +46,14 @@ func AnyFactory(args []string) (Subparser, error){
     }
     next_txt := []rune(args[1])
     next_eof := len(next_txt)
-	return func(data []rune, p *Parser)([]rune, error){
-        idx := p.idx
-        end := p.idx
+	return func(pctx *ParsingContext)([]rune, error){
+        data := pctx.data
+        idx := pctx.idx
+        end := pctx.idx
         next_idx := 0
         var next_char rune
 start:
-        if idx == p.eof{ goto break_ }
+        if idx == pctx.eof{ goto break_ }
         next_char = next_txt[next_idx]
         switch data[idx] {
         case next_char:
@@ -67,8 +69,8 @@ start:
             goto start
         }
 break_:
-        ret := data[p.idx: end]
-        p.idx = end
+        ret := data[pctx.idx: end]
+        pctx.idx = end
         return ret, nil
     }, nil
 
@@ -83,25 +85,27 @@ func UntilFactory(args []string) (Subparser, error){
     // almost same code as `any`, but to improve perfs avoiding tests
     // we copy/paste it 
     if !include {
-        return func(data []rune, p *Parser)([]rune, error){
-            start := p.idx
-            end := p.idx
+        return func(pctx *ParsingContext)([]rune, error){
+            data := pctx.data
+            start := pctx.idx
+            end := pctx.idx
             next_idx := 0
             var next_char rune
 start:
             // may be an error here...
-            if p.idx == p.eof{ goto break_ }
+            // TODO
+            if pctx.idx == pctx.eof{ goto break_ }
             next_char = next_txt[next_idx]
-            switch data[p.idx] {
+            switch data[pctx.idx] {
             case next_char:
-                end = p.idx - next_idx
+                end = pctx.idx - next_idx
                 next_idx++
                 if next_idx == next_eof{ goto break_ }
-                p.idx ++
+                pctx.idx ++
                 goto start
             default:
-                p.idx ++
-                end = p.idx
+                pctx.idx ++
+                end = pctx.idx
                 next_idx = 0
                 goto start
             }
@@ -110,27 +114,28 @@ break_:
             return ret, nil
         }, nil
     } else {
-        return func(data []rune, p *Parser)([]rune, error){
-            start := p.idx
+        return func(pctx *ParsingContext)([]rune, error){
+            data := pctx.data
+            start := pctx.idx
             next_idx := 0
             var next_char rune
 start:
             // TODO error...
-            if p.idx == p.eof{ goto break_ }
+            if pctx.idx == pctx.eof{ goto break_ }
             next_char = next_txt[next_idx]
-            switch data[p.idx] {
+            switch data[pctx.idx] {
             case next_char:
                 next_idx ++
-                p.idx ++
+                pctx.idx ++
                 if next_idx == next_eof{ goto break_ }
                 goto start
             default:
-                p.idx ++
+                pctx.idx ++
                 next_idx = 0
                 goto start
             }
 break_:
-            ret := data[start : p.idx]
+            ret := data[start : pctx.idx]
             return ret, nil
         }, nil
     }
@@ -139,10 +144,11 @@ break_:
 
 
 ///////////// IP
-func IPV4Parser(data []rune, pr *Parser) ([]rune, error){
-    p := pr.idx
+func IPV4Parser(pctx *ParsingContext) ([]rune, error){
+    data := pctx.data
+    p := pctx.idx
     cs :=0
-    pe, eof := pr.eof, pr.eof
+    pe, eof := pctx.eof, pctx.eof
     ts, te, act := 0, 0, 0
     _, _, _ = ts, te, act
     
@@ -175,8 +181,8 @@ ret_ip:
             return nil, errors.New(fmt.Sprintf("Error while parsing IP at column %d", p))
         }
     }
-    result := data[pr.idx:p+1]
-    pr.idx = p+1
+    result := data[pctx.idx:p+1]
+    pctx.idx = p+1
     return result, nil
 }
 

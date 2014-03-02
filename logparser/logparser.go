@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/codegangsta/cli"
 	"os"
+    "runtime"
+    "github.com/codegangsta/cli"
     conf "logparser_ng/config"
     "logparser_ng/formater"
     _ "logparser_ng/parser"
@@ -15,6 +16,7 @@ const VERSION string = "0.1-devel"
 func parseLog(input_file string, output_file string, pconfig string, fconfig string) {
     // set the reader
     reader := utils.NewFileReader(input_file)
+    //j := new(utils.Janitor)
 
     // set the parser
     // just to test, I don't know yet how shell escaping works...
@@ -39,6 +41,7 @@ func parseLog(input_file string, output_file string, pconfig string, fconfig str
 }
 
 func main() {
+    runtime.GOMAXPROCS(runtime.NumCPU())
 	app := cli.NewApp()
 	app.Name = "Logparser-ng"
 	app.Usage = "Parse a log and return a TSV of interesting patterns"

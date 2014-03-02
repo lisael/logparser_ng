@@ -3,10 +3,16 @@ package parser
 import (
     "errors"
     "fmt"
-    /*"regexp"*/
+    "sync"
 )
 
-type Subparser func([]rune, *Parser) ([]rune, error)
+type ParsingContext struct{
+    eof     int
+    idx     int
+    data    []rune
+}
+
+type Subparser func(*ParsingContext) ([]rune, error)
 
 type factory func([]string) (Subparser, error)
 
@@ -38,9 +44,6 @@ func NewParserBuildContext() *ParserBuildContext{
 
 type Parser struct{
     subparsers  []Subparser
-    data        []rune
-    eof         int
-    idx         int
 	resultNames	[]string
     ctx         *ParserBuildContext
 }
@@ -133,14 +136,32 @@ func (p *Parser) SubparsersCount() int{
     return len(p.subparsers)
 }
 
-func (p *Parser) ParseOnce(data []rune) (ResultMap, error){
+var pctxPool chan *ParsingContext = make(chan *ParsingContext, 1000000)
+var pctxLock *sync.Mutex= new(sync.Mutex)
+
+func (p *Parser)getParsingContext() *ParsingContext{
+    var pctx *ParsingContext
+    pctxLock.Lock()
+    if len(pctxPool) != 0 {
+        pctx = <- pctxPool
+    }
+    pctxLock.Unlock()
+    if pctx == nil {
+        pctx = new(ParsingContext)
+    }
+    return pctx
+}
+
+func (p *Parser) ParseOnce(data []rune) (*ResultMap, error){
 	results := ResultMap{}
-	p.eof = len(data)
-	p.idx = 0
+    pctx := p.getParsingContext()
+	pctx.eof = len(data)
+	pctx.idx = 0
+    pctx.data = data
 	var nextSubparser Subparser
 	for idx, name := range p.resultNames{
 		nextSubparser = p.subparsers[idx]
-		result, err := nextSubparser(data, p)
+		result, err := nextSubparser(pctx)
 		if err != nil {
 			return nil, err
 		}
@@ -149,7 +170,8 @@ func (p *Parser) ParseOnce(data []rune) (ResultMap, error){
 			results[name] = result
 		}
 	}
-	return results, nil
+    pctxPool <- pctx
+	return &results, nil
 }
 
 func (p *Parser) Pipe(input chan *string) (output chan *ResultMap){
@@ -161,17 +183,21 @@ func (p *Parser) Pipe(input chan *string) (output chan *ResultMap){
             buffer <- r
             go func(data []rune, rc chan *ResultMap){
                 result, _ := p.ParseOnce(data)
-                rc <- &result
+                rc <- result
             }([]rune(*line), r)
+            line = nil
         }
         close(buffer)
+        input = nil
     }()
     go func(){
         for res := range buffer{
             rm := <- res
+            res = nil
             output <- rm
         }
         close(output)
+        buffer=nil
     }()
     return
 }
@@ -186,8 +212,8 @@ func NewParser() *Parser{
 }
 
 func SkipFactory(length int) Subparser {
-	return func(data []rune, p *Parser)([]rune, error){
-		p.idx += length
+	return func(pctx *ParsingContext)([]rune, error){
+		pctx.idx += length
 		return nil, nil
 	}
 }
