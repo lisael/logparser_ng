@@ -31,10 +31,12 @@ func NewSVFormater(filename string, separator rune, fieldnames []string) (s *SVF
     return
 }
 
+
 func (s *SVFormater)Pipe(input chan *parser.ResultMap) (stop chan bool){
     stop = make(chan bool)
     buffer := make(chan chan bool, 100000)
     wl := new(sync.Mutex)
+    lines := [][]string{}
     go func(){
         for res := range input{
             r := make(chan bool, 1)
@@ -46,15 +48,25 @@ func (s *SVFormater)Pipe(input chan *parser.ResultMap) (stop chan bool){
                     line = append(line, string(rm[n]))
                 }
                 wl.Lock()
-                s.writer.Write(line)
+                lines = append(lines, line)
+                rmp = nil
+                if len(lines) == 15000{
+                    s.writer.WriteAll(lines)
+                    lines = [][]string{}
+                }
                 wl.Unlock()
                 rc <- true
             }(res, r)
         }
         close(buffer)
+        input = nil
     }()
     go func(){
-        for res := range buffer{ <-res }
+        for res := range buffer{<-res }
+        wl.Lock()
+        println(len(lines))
+        s.writer.WriteAll(lines)
+        wl.Unlock()
         s.writer.Flush()
         stop <- true
         close(stop)
