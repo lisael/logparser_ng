@@ -5,7 +5,7 @@ import (
     "runtime"
     "github.com/codegangsta/cli"
     conf "logparser_ng/config"
-    "logparser_ng/formater"
+    "logparser_ng/writer"
     _ "logparser_ng/parser"
     "logparser_ng/utils"
 )
@@ -21,21 +21,21 @@ func parseLog(input_file string, output_file string, pconfig string, fconfig str
     // set the parser
     // just to test, I don't know yet how shell escaping works...
     // TODO: test passing config in command line
-    //p, err := conf.MakeParser(pconfig)
-    p, err := conf.MakeParser("|ip:ipv4()| - - [|date:until(\"]\",false)|] |_ignore| |url| |_ignore| |http_code| |_ignore| |_ignore| \"|user_agent:until('\"',false)|\"")
+    //parser_, err := conf.MakeParser(pconfig)
+    parser_, err := conf.MakeParser("|ip:ipv4()| - - [|date:until(\"]\",false)|] |_ignore| |url| |_ignore| |http_code| |_ignore| |_ignore| \"|user_agent:until('\"',false)|\"")
     if err != nil { panic(err) }
 
     // set the writter
-    var formater_ *formater.SVFormater
+    var writer_ *writer.SVFormater
     switch fconfig{
     case "CSV":
-        formater_ = formater.NewSVFormater(output_file, rune(','), p.FieldNames())
+        writer_ = writer.NewSVFormater(output_file, rune(','), parser_.FieldNames())
     case "TSV":
-        formater_ = formater.NewSVFormater(output_file, rune('\t'), p.FieldNames())
+        writer_ = writer.NewSVFormater(output_file, rune('\t'), parser_.FieldNames())
     }
 
     // launch the pipeline
-    stop := formater_.Pipe(p.Pipe(reader.ReadLines()))
+    stop := writer_.Pipe(parser_.Pipe(reader.ReadLines()))
     <- stop
     return
 }
