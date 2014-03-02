@@ -4,6 +4,7 @@ import (
     "bufio"
     "os"
     "io"
+    "runtime"
 )
 
 type FileReader struct{
@@ -38,6 +39,29 @@ func (r *FileReader)ReadLines() (output chan *string){
             output <- &line
         }
         close(output)
+    }()
+    return
+}
+
+type Janitor struct{}
+
+func (j *Janitor)Pipe(input chan *string) (output chan *string){
+    output = make(chan *string)
+    go func (){
+        i := 0
+        for line := range input{
+            i++
+            if i == 200000 {
+                //println("GC")
+                //runtime.GC()
+                //println(runtime.NumGoroutine())
+                i=0
+            }
+            output <- line
+        }
+        close(output)
+        input = nil
+        runtime.GC()
     }()
     return
 }
