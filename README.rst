@@ -8,7 +8,10 @@ with a clean codebase and easy configuration
 Features
 ========
 
-TODO
+Provides lib to build custom log parsers and a CLI that is flexible enough
+for most common cases
+
+TODO: list all features
 
 Usage
 =====
@@ -31,7 +34,7 @@ Lacks a Makefile at the moment, so:
 
   - ``$ ragel -Z -G2 -o src/logparser_ng/config/config.go src/logparser_ng/config/config.rl``
   
-  - ``$ ragel -Z -G2 -o src/logparser_ng/parser/subparsers.go src/logparser_ng/parser/subparsers.rl
+  - ``$ ragel -Z -G2 -o src/logparser_ng/parser/subparsers.go src/logparser_ng/parser/subparsers.rl``
   
   - ``$ go get``
 
@@ -59,12 +62,13 @@ sends data to its Process method (maybe asynchronously) and returns an output
 chan filled with the results.
 
 Logpaser has just to configure a bunch ouf services (reader, parser, filter, 
-formater and writer) and pipe them together like so (in logparser/main.go):
+formater and writer) and pipe them together like so (in logparser/main.go)
 
-```
-stopChan := writer.Pipe(formater.Pipe(filter.Pipe(parser.Pipe(reader.Read(inputPath)))))
-<- stopChan
-```
+.. code-block:: go
+
+  stopChan := writer.Pipe(formater.Pipe(filter.Pipe(parser.Pipe(reader.Read(inputPath)))))
+  <- stopChan
+
 
 The first lines of result are written before the last lines of the input are
 read. Hence, parsing 8M lines (1,4GB) takes 2 minutes and less of 200MB of RAM
@@ -106,4 +110,21 @@ I bet you don't need any advice.
 Make it awesome !
 +++++++++++++++++
 
+TODO
+====
 
+- enable communication from (error handling) and to (processing management:
+  Pause/Resume...) pipeline elements
+  
+- add formaters
+
+- add filters
+
+- count parsing errors and stop when a given ratio is exceeded
+
+- make TextParsers (text outside of tokens) strict about the actual text
+  (it only skips the length of the text without checking)
+
+- doc
+
+- update tests (subparsers test don't build any more)
