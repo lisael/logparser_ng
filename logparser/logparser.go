@@ -29,9 +29,9 @@ func parseLog(input_file string, output_file string, pconfig string, fconfig str
     var writer_ *writer.SVFormater
     switch fconfig{
     case "CSV":
-        writer_ = writer.NewSVFormater(output_file, rune(','), parser_.FieldNames())
+        writer_ = writer.NewSVFormater(output_file, rune(','), parser_.FieldNames(), 5000)
     case "TSV":
-        writer_ = writer.NewSVFormater(output_file, rune('\t'), parser_.FieldNames())
+        writer_ = writer.NewSVFormater(output_file, rune('\t'), parser_.FieldNames(), 5000)
     }
 
     // launch the pipeline
