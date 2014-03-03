@@ -81,13 +81,23 @@ Parser
 ------
 
 A parser is basically a list of subparser functions (or closure) called
-sequentially while parsing a string. It stores a global vars such as current
-read char index in the input.  Once the parsing is completed, the Parser returns
-a map[string][]rune which is passed to an output formater
+sequentially while parsing a string. Once the parsing is completed, the
+Parser returns a map[string][]rune which is passed to an output formater
 
-A parser can be built using a config string looking like
+A parser for lines like::
 
-``|ip:ipv4()| some stuff |_ignore| [|date:until(],false)|]``
+  42.42.42.42 some stuff 412 [Sun Mar 2 11:37:05 CET 2014]
+
+can be built using a config string looking like::
+
+  |ip:ipv4()| some stuff |_ignore| [|date:until(],false)|]
+  
+it will return::
+
+  map[string]rune[]{
+    "ip": "42.42.42.42",
+    "date": "Sun Mar 2 11:37:05 CET 2014"
+  }
 
 Each token is in the form ``|name:factory(args)|`` (except ``|_ignore|`` which
 is a special token and is equivalent to ``|:_ignore()|``)
