@@ -3,7 +3,7 @@ package utils
 import (
     "bufio"
     "os"
-    "io"
+	"io"
     "runtime"
 )
 
@@ -26,17 +26,21 @@ func NewFileReader(filename string) (r *FileReader){
 }
 
 func (r *FileReader)ReadLines() (output chan *string){
-    output = make(chan *string)
+    output = make(chan *string, 1000)
+    /*s := "42.42.42.42 - - [03/Jan/2014:06:25:33 +0100] \"GET http://www.example.com/stuff.html HTTP/1.1\" 302 26 \"-\" \"Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)\""*/
+	
     go func (){
-        for {
-            line, err := r.reader.ReadString('\n')
-            if err != nil {
-                if err != io.EOF {
-                    panic(err)
-                }
-                break
-            }
-            output <- &line
+		/*for i:=0; i<1000000; i++{*/
+		for {
+			line, err := r.reader.ReadString('\n')
+			if err != nil {
+				if err != io.EOF {
+					panic(err)
+				}
+				break
+			}
+			output <- &line
+            /*output <- &s*/
         }
         close(output)
     }()

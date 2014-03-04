@@ -4,6 +4,7 @@ import (
     "errors"
     "fmt"
     "sync"
+	"runtime"
 )
 
 type ParsingContext struct{
@@ -42,12 +43,110 @@ func NewParserBuildContext() *ParserBuildContext{
     return p
 }
 
+type parseWork struct{
+	data []rune
+	result chan *ResultMap
+}
+
 type Parser struct{
     subparsers  []Subparser
 	resultNames	[]string
     ctx         *ParserBuildContext
+	workers		int // max number of workers
+	running		int // running workers
+	works		chan *parseWork // work queue
+	results		chan chan *ResultMap // pending results
+	stop		chan bool
 }
 
+//////////////////// plumbing
+func NewParser() *Parser{
+    p := new(Parser)
+    p.subparsers = []Subparser{}
+	p.resultNames = []string{}
+    p.ctx = NewParserBuildContext()
+	// this task is CPU bound
+	concurency := runtime.NumCPU()
+	p.workers = concurency
+	p.works = make(chan *parseWork, 1000)
+	p.results = make(chan chan *ResultMap, 1000)
+	p.stop = make(chan bool)
+	for i:=0; i<p.workers; i++ {
+		go p.worker()
+		p.running ++
+	}
+    return p
+}
+
+func (p *Parser) worker(){
+	for{
+		select{
+		case <- p.stop:
+			return
+		case w := <-p.works:
+			rm, _ := p.ParseOnce(w.data)
+			w.result <- rm
+		}
+	}
+}
+
+func (p *Parser) Pipe(input chan *string) (output chan *ResultMap){
+    output = make(chan *ResultMap, 1000)
+    go func(){
+		rounds := 0
+		full := 0
+		empty := 0
+        for line := range input{
+			rounds ++
+			if len(p.results) == 1000{
+				full ++
+			}
+            r := make(chan *ResultMap, 1)
+            p.results <- r
+			w := new(parseWork)
+			w.data = []rune(*line)
+			w.result = r
+			p.works <- w
+			if len(input) == 0 {
+				empty ++
+			}
+        }
+		println("close parser results")
+		println(rounds)
+		println(empty)
+		println(full)
+		close(p.results)
+    }()
+    go func(){
+		rounds := 0
+		full := 0
+		empty := 0
+        for res := range p.results{
+			rounds ++
+			if len(output) == 1000 {
+				full ++
+			}
+            rm := <- res
+            output <- rm
+			if len(p.results) == 0 {
+				empty ++
+			}
+        }
+		println("close parser output")
+		println(rounds)
+		println(empty)
+		println(full)
+        close(output)
+		for p.running > 0{
+			p.stop <- true
+			p.running --
+		}
+        close(p.works)
+    }()
+    return
+}
+
+////////////// features
 
 func (p *Parser) FieldNames() []string{
     names := []string{}
@@ -174,42 +273,6 @@ func (p *Parser) ParseOnce(data []rune) (*ResultMap, error){
 	return &results, nil
 }
 
-func (p *Parser) Pipe(input chan *string) (output chan *ResultMap){
-    output = make(chan *ResultMap)
-    buffer := make(chan chan *ResultMap, 100000)
-    go func(){
-        for line := range input{
-            r := make(chan *ResultMap, 1)
-            buffer <- r
-            go func(data []rune, rc chan *ResultMap){
-                result, _ := p.ParseOnce(data)
-                rc <- result
-            }([]rune(*line), r)
-            line = nil
-        }
-        close(buffer)
-        input = nil
-    }()
-    go func(){
-        for res := range buffer{
-            rm := <- res
-            res = nil
-            output <- rm
-        }
-        close(output)
-        buffer=nil
-    }()
-    return
-}
-
-
-func NewParser() *Parser{
-    p := new(Parser)
-    p.subparsers = []Subparser{}
-	p.resultNames = []string{}
-    p.ctx = NewParserBuildContext()
-    return p
-}
 
 func SkipFactory(length int) Subparser {
 	return func(pctx *ParsingContext)([]rune, error){

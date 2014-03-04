@@ -8,6 +8,7 @@ import (
     "logparser_ng/writer"
     _ "logparser_ng/parser"
     "logparser_ng/utils"
+	"logparser_ng/filter"
 )
 
 const VERSION string = "0.1-devel"
@@ -33,15 +34,16 @@ func parseLog(input_file string, output_file string, pconfig string, fconfig str
     case "TSV":
         writer_ = writer.NewSVFormater(output_file, rune('\t'), parser_.FieldNames(), 5000)
     }
+	df := filter.NewDumyFilter()
 
     // launch the pipeline
-    stop := writer_.Pipe(parser_.Pipe(reader.ReadLines()))
+    stop := writer_.Pipe(df.Pipe(parser_.Pipe(reader.ReadLines())))
     <- stop
     return
 }
 
 func main() {
-    runtime.GOMAXPROCS(runtime.NumCPU())
+    runtime.GOMAXPROCS(runtime.NumCPU() * 12)
 	app := cli.NewApp()
 	app.Name = "Logparser-ng"
 	app.Usage = "Parse a log and return a TSV of interesting patterns"
