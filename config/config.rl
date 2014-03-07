@@ -10,11 +10,11 @@ func MakeFormater(data string){
 //TODO
 }
 
-func MakeParser(data string) (*plib.Parser, error){
+func MakeParser(data string, bufferSize int, errchan chan *plib.ParsingContext) (*plib.Parser, error){
     mark := 0
     cs, p, pe, eof := 0, 0, len(data), len(data)
     _ = eof
-    parser := plib.NewParser()
+    parser := plib.NewParser(bufferSize, errchan)
     tokenName := ""
     factoryName := ""
     argList := []string{}

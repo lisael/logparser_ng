@@ -6,12 +6,48 @@ import (
     "github.com/codegangsta/cli"
     conf "logparser_ng/config"
     "logparser_ng/writer"
-    _ "logparser_ng/parser"
+    "logparser_ng/parser"
     "logparser_ng/utils"
-	"logparser_ng/filter"
+    "time"
+    "fmt"
+	//"logparser_ng/filter"
 )
 
 const VERSION string = "0.1-devel"
+
+func stat() error{
+    //memstats := cmd.Flag.Lookup("memstats").Value.String()
+    memstats := "mem.dat"
+    if memstats != "" {
+        //interval := cmd.Flag.Lookup("meminterval").Value.Get().(time.Duration)
+        interval := time.Duration(10000000)
+
+        fileMemStats, err := os.Create(memstats)
+        if err != nil {
+            return err
+        }
+
+        fileMemStats.WriteString("# Time\tHeapSys\tHeapAlloc\tHeapIdle\tHeapReleased\n")
+
+        go func() {
+            var stats runtime.MemStats
+
+            start := time.Now().UnixNano()
+
+            for {
+                runtime.ReadMemStats(&stats)
+                if fileMemStats != nil {
+                    fileMemStats.WriteString(fmt.Sprintf("%d\t%d\t%d\t%d\t%d\n",
+                        (time.Now().UnixNano()-start)/1000000, stats.HeapSys, stats.HeapAlloc, stats.HeapIdle, stats.HeapReleased))
+                    time.Sleep(interval)
+                } else {
+                    break
+                }
+            }
+        }()
+    }
+    return nil
+}
 
 
 func parseLog(input_file string, output_file string, pconfig string, fconfig string) {
@@ -19,11 +55,24 @@ func parseLog(input_file string, output_file string, pconfig string, fconfig str
     reader := utils.NewFileReader(input_file)
     //j := new(utils.Janitor)
 
+    // error handling
+    errchan := make(chan *parser.ParsingContext)
+    stopErrors := make(chan bool)
+    go func(){
+        for {
+            select{
+            case pctx := <- errchan:
+                panic(pctx.Error)
+            case <- stopErrors:
+                return
+            }
+        }
+    }()
     // set the parser
     // just to test, I don't know yet how shell escaping works...
     // TODO: test passing config in command line
     //parser_, err := conf.MakeParser(pconfig)
-    parser_, err := conf.MakeParser("|ip:ipv4()| - - [|date:until(\"]\",false)|] |_ignore| |url| |_ignore| |http_code| |_ignore| |_ignore| \"|user_agent:until('\"',false)|\"")
+    parser_, err := conf.MakeParser("|ip:ipv4()| - - [|date:until(\"]\",false)|] |_ignore| |url| |_ignore| |http_code| |_ignore| |_ignore| \"|user_agent:until('\"',false)|\"", 1000, errchan)
     if err != nil { panic(err) }
 
     // set the writter
@@ -34,16 +83,18 @@ func parseLog(input_file string, output_file string, pconfig string, fconfig str
     case "TSV":
         writer_ = writer.NewSVFormater(output_file, rune('\t'), parser_.FieldNames(), 5000)
     }
-	df := filter.NewDumyFilter()
+	//df := filter.NewDumyFilter()
 
     // launch the pipeline
-    stop := writer_.Pipe(df.Pipe(parser_.Pipe(reader.ReadLines())))
+    stop := writer_.Pipe(parser_.Pipe(reader.ReadLines()))
     <- stop
+    stopErrors <- true
     return
 }
 
 func main() {
     runtime.GOMAXPROCS(runtime.NumCPU() * 12)
+    _ = stat()
 	app := cli.NewApp()
 	app.Name = "Logparser-ng"
 	app.Usage = "Parse a log and return a TSV of interesting patterns"
