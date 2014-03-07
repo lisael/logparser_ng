@@ -3,15 +3,19 @@ package parser
 import (
     "errors"
     "fmt"
-    "sync"
 	"runtime"
 )
 
 type ParsingContext struct{
     eof     int
     idx     int
-    data    []rune
+    LineNr  int
+    Data    []rune
+    Tokens  ResultMap
+    Error   error
 }
+    
+var PctxPool chan *ParsingContext
 
 type Subparser func(*ParsingContext) ([]rune, error)
 
@@ -45,7 +49,8 @@ func NewParserBuildContext() *ParserBuildContext{
 
 type parseWork struct{
 	data []rune
-	result chan *ResultMap
+	result chan *ParsingContext
+    linenr int
 }
 
 type Parser struct{
@@ -55,12 +60,13 @@ type Parser struct{
 	workers		int // max number of workers
 	running		int // running workers
 	works		chan *parseWork // work queue
-	results		chan chan *ResultMap // pending results
+	results		chan chan *ParsingContext // pending results
 	stop		chan bool
+    errors      chan *ParsingContext
 }
 
 //////////////////// plumbing
-func NewParser() *Parser{
+func NewParser(bufferSize int, err chan *ParsingContext) *Parser{
     p := new(Parser)
     p.subparsers = []Subparser{}
 	p.resultNames = []string{}
@@ -68,8 +74,9 @@ func NewParser() *Parser{
 	// this task is CPU bound
 	concurency := runtime.NumCPU()
 	p.workers = concurency
-	p.works = make(chan *parseWork, 1000)
-	p.results = make(chan chan *ResultMap, 1000)
+    PctxPool = make(chan *ParsingContext, bufferSize + bufferSize/3)
+	p.works = make(chan *parseWork, bufferSize)
+	p.results = make(chan chan *ParsingContext, bufferSize)
 	p.stop = make(chan bool)
 	for i:=0; i<p.workers; i++ {
 		go p.worker()
@@ -84,58 +91,35 @@ func (p *Parser) worker(){
 		case <- p.stop:
 			return
 		case w := <-p.works:
-			rm, _ := p.ParseOnce(w.data)
+			rm, _ := p.ParseOnce(w.data, w.linenr)
 			w.result <- rm
 		}
 	}
 }
 
-func (p *Parser) Pipe(input chan *string) (output chan *ResultMap){
-    output = make(chan *ResultMap, 1000)
+func (p *Parser) Pipe(input chan *string) (output chan *ParsingContext){
+    output = make(chan *ParsingContext, 1000)
     go func(){
-		rounds := 0
-		full := 0
-		empty := 0
+        linenr := 0
         for line := range input{
-			rounds ++
-			if len(p.results) == 1000{
-				full ++
-			}
-            r := make(chan *ResultMap, 1)
+            linenr ++
+            r := make(chan *ParsingContext, 1)
             p.results <- r
 			w := new(parseWork)
 			w.data = []rune(*line)
+            w.linenr = linenr
+            line = nil
 			w.result = r
 			p.works <- w
-			if len(input) == 0 {
-				empty ++
-			}
         }
-		println("close parser results")
-		println(rounds)
-		println(empty)
-		println(full)
 		close(p.results)
     }()
     go func(){
-		rounds := 0
-		full := 0
-		empty := 0
         for res := range p.results{
-			rounds ++
-			if len(output) == 1000 {
-				full ++
-			}
             rm := <- res
+            res = nil
             output <- rm
-			if len(p.results) == 0 {
-				empty ++
-			}
         }
-		println("close parser output")
-		println(rounds)
-		println(empty)
-		println(full)
         close(output)
 		for p.running > 0{
 			p.stop <- true
@@ -235,28 +219,23 @@ func (p *Parser) SubparsersCount() int{
     return len(p.subparsers)
 }
 
-var pctxPool chan *ParsingContext = make(chan *ParsingContext, 1000000)
-var pctxLock *sync.Mutex= new(sync.Mutex)
-
 func (p *Parser)getParsingContext() *ParsingContext{
     var pctx *ParsingContext
-    pctxLock.Lock()
-    if len(pctxPool) != 0 {
-        pctx = <- pctxPool
-    }
-    pctxLock.Unlock()
-    if pctx == nil {
+    select {
+    case pctx = <- PctxPool:
+    default:
         pctx = new(ParsingContext)
     }
     return pctx
 }
 
-func (p *Parser) ParseOnce(data []rune) (*ResultMap, error){
-	results := ResultMap{}
+func (p *Parser) ParseOnce(data []rune, linenr int) (*ParsingContext, error){
     pctx := p.getParsingContext()
 	pctx.eof = len(data)
 	pctx.idx = 0
-    pctx.data = data
+    pctx.Data = data
+    pctx.Tokens = ResultMap{}
+    pctx.LineNr = linenr
 	var nextSubparser Subparser
 	for idx, name := range p.resultNames{
 		nextSubparser = p.subparsers[idx]
@@ -266,11 +245,10 @@ func (p *Parser) ParseOnce(data []rune) (*ResultMap, error){
 		}
 		// do not save unnamed chunks
 		if name != ""{
-			results[name] = result
+			pctx.Tokens[name] = result
 		}
 	}
-    pctxPool <- pctx
-	return &results, nil
+	return pctx, nil
 }
 
 

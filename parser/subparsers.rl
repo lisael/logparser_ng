@@ -17,11 +17,10 @@ func (d DeferredFactoryDef)Error() string{return ""}
 
 ////////////// non blank
 func NonBlankParser(pctx *ParsingContext) ([]rune, error){
-    data := pctx.data
     startIdx := pctx.idx
 start:
     if pctx.idx == pctx.eof{ goto break_ }
-    switch data[pctx.idx] {
+    switch pctx.Data[pctx.idx] {
     case ' ', '\t':
         goto break_
     default:
@@ -29,7 +28,7 @@ start:
         goto start
     }
 break_:
-    return data[startIdx: pctx.idx], nil
+    return pctx.Data[startIdx: pctx.idx], nil
 }
 
 // fake factory, requires no args
@@ -47,7 +46,6 @@ func AnyFactory(args []string) (Subparser, error){
     next_txt := []rune(args[1])
     next_eof := len(next_txt)
 	return func(pctx *ParsingContext)([]rune, error){
-        data := pctx.data
         idx := pctx.idx
         end := pctx.idx
         next_idx := 0
@@ -55,7 +53,7 @@ func AnyFactory(args []string) (Subparser, error){
 start:
         if idx == pctx.eof{ goto break_ }
         next_char = next_txt[next_idx]
-        switch data[idx] {
+        switch pctx.Data[idx] {
         case next_char:
             end = idx - next_idx
             next_idx++
@@ -69,7 +67,7 @@ start:
             goto start
         }
 break_:
-        ret := data[pctx.idx: end]
+        ret := pctx.Data[pctx.idx: end]
         pctx.idx = end
         return ret, nil
     }, nil
@@ -86,7 +84,6 @@ func UntilFactory(args []string) (Subparser, error){
     // we copy/paste it 
     if !include {
         return func(pctx *ParsingContext)([]rune, error){
-            data := pctx.data
             start := pctx.idx
             end := pctx.idx
             next_idx := 0
@@ -96,7 +93,7 @@ start:
             // TODO
             if pctx.idx == pctx.eof{ goto break_ }
             next_char = next_txt[next_idx]
-            switch data[pctx.idx] {
+            switch pctx.Data[pctx.idx] {
             case next_char:
                 end = pctx.idx - next_idx
                 next_idx++
@@ -110,12 +107,11 @@ start:
                 goto start
             }
 break_:
-            ret := data[start : end]
+            ret := pctx.Data[start : end]
             return ret, nil
         }, nil
     } else {
         return func(pctx *ParsingContext)([]rune, error){
-            data := pctx.data
             start := pctx.idx
             next_idx := 0
             var next_char rune
@@ -123,7 +119,7 @@ start:
             // TODO error...
             if pctx.idx == pctx.eof{ goto break_ }
             next_char = next_txt[next_idx]
-            switch data[pctx.idx] {
+            switch pctx.Data[pctx.idx] {
             case next_char:
                 next_idx ++
                 pctx.idx ++
@@ -135,7 +131,7 @@ start:
                 goto start
             }
 break_:
-            ret := data[start : pctx.idx]
+            ret := pctx.Data[start : pctx.idx]
             return ret, nil
         }, nil
     }
@@ -145,7 +141,7 @@ break_:
 
 ///////////// IP
 func IPV4Parser(pctx *ParsingContext) ([]rune, error){
-    data := pctx.data
+    data := pctx.Data
     p := pctx.idx
     cs :=0
     pe, eof := pctx.eof, pctx.eof

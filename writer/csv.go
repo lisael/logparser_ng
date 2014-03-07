@@ -32,21 +32,25 @@ func NewSVFormater(filename string, separator rune, fieldnames []string, bufferS
 }
 
 
-func (s *SVFormater)Pipe(input chan *parser.ResultMap) (stop chan bool){
+func (s *SVFormater)Pipe(input chan *parser.ParsingContext) (stop chan bool){
     stop = make(chan bool)
     lines := [][]string{}
     go func(){
-        for res := range input{
+        for pctx := range input{
             line := []string{}
-            rm := *res
             for _, n := range s.fieldnames{
-                 line = append(line, string(rm[n]))
+                 line = append(line, string(pctx.Tokens[n]))
             }
             lines = append(lines, line)
             if len(lines) == s.buffer{
                 s.writer.WriteAll(lines)
                 lines = [][]string{}
 			}
+            select{
+            case parser.PctxPool <- pctx:
+            default:
+                pctx = nil
+            }
 		}
         s.writer.WriteAll(lines)
         stop <- true
