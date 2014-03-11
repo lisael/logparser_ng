@@ -10,18 +10,18 @@ type ParsingContext struct{
     eof     int
     idx     int
     LineNr  int
-    Data    []rune
+    Data    string
     Tokens  ResultMap
     Error   error
 }
     
 var PctxPool chan *ParsingContext
 
-type Subparser func(*ParsingContext) ([]rune, error)
+type Subparser func(*ParsingContext) (string, error)
 
 type factory func([]string) (Subparser, error)
 
-type ResultMap map[string][]rune
+type ResultMap map[string]string
 
 var factories map[string]factory = map[string]factory{
 	"_ignore": NonBlankFactory,
@@ -48,7 +48,7 @@ func NewParserBuildContext() *ParserBuildContext{
 }
 
 type parseWork struct{
-	data []rune
+	data string
 	result chan *ParsingContext
     linenr int
 }
@@ -106,7 +106,7 @@ func (p *Parser) Pipe(input chan *string) (output chan *ParsingContext){
             r := make(chan *ParsingContext, 1)
             p.results <- r
 			w := new(parseWork)
-			w.data = []rune(*line)
+			w.data = string(*line)
             w.linenr = linenr
             line = nil
 			w.result = r
@@ -229,7 +229,7 @@ func (p *Parser)getParsingContext() *ParsingContext{
     return pctx
 }
 
-func (p *Parser) ParseOnce(data []rune, linenr int) (*ParsingContext, error){
+func (p *Parser) ParseOnce(data string, linenr int) (*ParsingContext, error){
     pctx := p.getParsingContext()
 	pctx.eof = len(data)
 	pctx.idx = 0
@@ -253,9 +253,9 @@ func (p *Parser) ParseOnce(data []rune, linenr int) (*ParsingContext, error){
 
 
 func SkipFactory(length int) Subparser {
-	return func(pctx *ParsingContext)([]rune, error){
+	return func(pctx *ParsingContext)(string, error){
 		pctx.idx += length
-		return nil, nil
+		return "", nil
 	}
 }
 

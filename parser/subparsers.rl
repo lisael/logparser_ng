@@ -16,7 +16,7 @@ type DeferredFactoryDef struct{
 func (d DeferredFactoryDef)Error() string{return ""}
 
 ////////////// non blank
-func NonBlankParser(pctx *ParsingContext) ([]rune, error){
+func NonBlankParser(pctx *ParsingContext) (string, error){
     startIdx := pctx.idx
 start:
     if pctx.idx == pctx.eof{ goto break_ }
@@ -43,13 +43,13 @@ func AnyFactory(args []string) (Subparser, error){
         d.Fact = AnyFactory
         return nil, d
     }
-    next_txt := []rune(args[1])
+    next_txt := args[1]
     next_eof := len(next_txt)
-	return func(pctx *ParsingContext)([]rune, error){
+	return func(pctx *ParsingContext)(string, error){
         idx := pctx.idx
         end := pctx.idx
         next_idx := 0
-        var next_char rune
+        var next_char uint8
 start:
         if idx == pctx.eof{ goto break_ }
         next_char = next_txt[next_idx]
@@ -77,17 +77,17 @@ break_:
 
 ////////////// until
 func UntilFactory(args []string) (Subparser, error){
-    next_txt := []rune(args[0])
+    next_txt := args[0]
     next_eof := len(next_txt)
     include := args[1] == "true"
     // almost same code as `any`, but to improve perfs avoiding tests
     // we copy/paste it 
     if !include {
-        return func(pctx *ParsingContext)([]rune, error){
+        return func(pctx *ParsingContext)(string, error){
             start := pctx.idx
             end := pctx.idx
             next_idx := 0
-            var next_char rune
+            var next_char uint8
 start:
             // may be an error here...
             // TODO
@@ -111,10 +111,10 @@ break_:
             return ret, nil
         }, nil
     } else {
-        return func(pctx *ParsingContext)([]rune, error){
+        return func(pctx *ParsingContext)(string, error){
             start := pctx.idx
             next_idx := 0
-            var next_char rune
+            var next_char uint8
 start:
             // TODO error...
             if pctx.idx == pctx.eof{ goto break_ }
@@ -140,7 +140,7 @@ break_:
 
 
 ///////////// IP
-func IPV4Parser(pctx *ParsingContext) ([]rune, error){
+func IPV4Parser(pctx *ParsingContext) (string, error){
     data := pctx.Data
     p := pctx.idx
     cs :=0
@@ -153,7 +153,7 @@ func IPV4Parser(pctx *ParsingContext) ([]rune, error){
         write data;
 
         action ip_error{
-            return nil, errors.New(fmt.Sprintf("Error while parsing IP at column %d", p))
+            return "", errors.New(fmt.Sprintf("Error while parsing IP at column %d", p))
         }
         action ret{
             goto ret_ip
@@ -174,7 +174,7 @@ ret_ip:
     // next char must not be a digit
     if eof-p > 1 {
         if data[p+1] > 47 && data[p+1] < 58{
-            return nil, errors.New(fmt.Sprintf("Error while parsing IP at column %d", p))
+            return "", errors.New(fmt.Sprintf("Error while parsing IP at column %d", p))
         }
     }
     result := data[pctx.idx:p+1]

@@ -39,7 +39,7 @@ func (s *SVFormater)Pipe(input chan *parser.ParsingContext) (stop chan bool){
         for pctx := range input{
             line := []string{}
             for _, n := range s.fieldnames{
-                 line = append(line, string(pctx.Tokens[n]))
+                 line = append(line, pctx.Tokens[n])
             }
             lines = append(lines, line)
             if len(lines) == s.buffer{
