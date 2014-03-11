@@ -1,7 +1,7 @@
 package main
 
 import (
-    pconf "logparser_ng/config"
+    pconf "github.com/lisael/logparser_ng/config"
     "time"
     "testing"
 )

@@ -1,7 +1,7 @@
 package filter
 
 import (
-	"logparser_ng/parser"
+	"github.com/lisael/logparser_ng/parser"
 	"runtime"
 	"time"
 )

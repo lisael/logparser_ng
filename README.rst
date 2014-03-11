@@ -30,7 +30,7 @@ Lacks a Makefile at the moment, so:
 
   - make a clean go env (/bin and /src)
 
-  - clone the project into /src
+  - ``$ go get github.com/lisael/logparser_ng``
 
   - ``$ ragel -Z -G2 -o src/logparser_ng/config/config.go src/logparser_ng/config/config.rl``
   
@@ -48,7 +48,7 @@ It's Open Source
 Fork It
 +++++++
 
-``$ git clone https://github.com/lisael/logparser-ng.git``
+``$ git clone https://github.com/lisael/logparser_ng.git``
 
 Hack It
 +++++++
@@ -71,8 +71,8 @@ formater and writer) and pipe them together like so (in logparser/main.go)
 
 
 The first lines of result are written before the last lines of the input are
-read. Hence, parsing 8M lines (1,4GB) takes 2 minutes and less of 200MB of RAM
-on a dual core proc.
+read. Hence, parsing 8M lines (1,4GB) takes less than minutes and 10MB of RAM
+on an aged dual core proc.
 
 The pipe line (well, and go itself) allows heavy concurrency while keeping
 readable and testable code.

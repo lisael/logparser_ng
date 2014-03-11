@@ -2,7 +2,7 @@ package writer
 
 import (
     "encoding/csv"
-    "logparser_ng/parser"
+    "github.com/lisael/logparser_ng/parser"
     "os"
 )
 
@@ -39,6 +39,7 @@ func (s *SVFormater)Pipe(input chan *parser.ParsingContext) (stop chan bool){
         for pctx := range input{
             line := []string{}
             for _, n := range s.fieldnames{
+                 _ = pctx.Tokens
                  line = append(line, pctx.Tokens[n])
             }
             lines = append(lines, line)

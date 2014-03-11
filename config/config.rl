@@ -2,7 +2,7 @@ package config
 
 import (
     "fmt"
-    plib "logparser_ng/parser"
+    plib "github.com/lisael/logparser_ng/parser"
     "errors"
 )
 
